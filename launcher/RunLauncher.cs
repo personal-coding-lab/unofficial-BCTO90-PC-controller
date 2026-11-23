@@ -14,7 +14,7 @@ internal static class RunLauncher
         if (!File.Exists(script))
         {
             MessageBox.Show(
-                "같은 폴더에서 run.ps1을 찾지 못했습니다.",
+                "Could not find run.ps1 in the same folder.",
                 "BCTO90 Controller",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
@@ -38,7 +38,7 @@ internal static class RunLauncher
         catch (Exception exception)
         {
             MessageBox.Show(
-                "프로그램을 시작하지 못했습니다.\n\n" + exception.Message,
+                "Could not start the program.\n\n" + exception.Message,
                 "BCTO90 Controller",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);

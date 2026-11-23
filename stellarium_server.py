@@ -84,7 +84,7 @@ class StellariumServer:
             server.bind((self.host, self.port))
             server.listen(2)
             server.settimeout(0.5)
-            self.emit("stellarium_status", f"대기 중 {self.host}:{self.port}")
+            self.emit("stellarium_status", f"Listening on {self.host}:{self.port}")
             while not self._stop.is_set():
                 try:
                     client, address = server.accept()
@@ -99,12 +99,12 @@ class StellariumServer:
                     daemon=True,
                 ).start()
         except Exception as exc:
-            self.emit("error", f"Stellarium 서버 오류: {type(exc).__name__}: {exc}")
+            self.emit("error", f"Stellarium server error: {type(exc).__name__}: {exc}")
         finally:
-            self.emit("stellarium_status", "중지됨")
+            self.emit("stellarium_status", "Stopped")
 
     def _client_loop(self, client: socket.socket, address) -> None:
-        self.emit("stellarium_client", f"연결됨 {address[0]}:{address[1]}")
+        self.emit("stellarium_client", f"Connected: {address[0]}:{address[1]}")
         buffer = bytearray()
         client.settimeout(0.25)
         last_position = 0.0
@@ -121,7 +121,7 @@ class StellariumServer:
                     while len(buffer) >= 2:
                         packet_length = int.from_bytes(buffer[:2], "little")
                         if packet_length < 4 or packet_length > 1024:
-                            raise ValueError(f"잘못된 Stellarium packet length: {packet_length}")
+                            raise ValueError(f"Invalid Stellarium packet length: {packet_length}")
                         if len(buffer) < packet_length:
                             break
                         packet = bytes(buffer[:packet_length])
@@ -135,6 +135,6 @@ class StellariumServer:
                         client.sendall(encode_position(*position))
                         last_position = now
         except Exception as exc:
-            self.emit("log", f"Stellarium client 오류: {type(exc).__name__}: {exc}")
+            self.emit("log", f"Stellarium client error: {type(exc).__name__}: {exc}")
         finally:
-            self.emit("stellarium_client", "연결 해제")
+            self.emit("stellarium_client", "Disconnected")

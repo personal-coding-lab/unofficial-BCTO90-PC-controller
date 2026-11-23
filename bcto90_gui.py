@@ -13,7 +13,7 @@ from typing import Callable
 try:
     from bleak import BleakClient, BleakScanner
 except ImportError as exc:  # pragma: no cover - shown as a GUI error at startup
-    raise SystemExit("Bleak가 없습니다. run.ps1을 실행하거나 'pip install bleak'를 실행하세요.") from exc
+    raise SystemExit("Bleak is not installed. Run run.ps1 or execute 'pip install bleak'.") from exc
 
 from bcto_protocol import (
     CMD_POSITION,
@@ -63,7 +63,7 @@ class DeviceInfo:
 
     @property
     def label(self) -> str:
-        return f"{self.name or '(이름 없음)'}  [{self.address}]  {self.rssi} dBm"
+        return f"{self.name or '(unnamed)'}  [{self.address}]  {self.rssi} dBm"
 
 
 class BleController:
@@ -97,7 +97,7 @@ class BleController:
         future.add_done_callback(done)
 
     async def scan(self) -> None:
-        self.emit("status", "BLE 검색 중…")
+        self.emit("status", "Scanning for BLE devices…")
         found = await BleakScanner.discover(timeout=8, return_adv=True)
         devices: list[DeviceInfo] = []
         for address, (device, advertisement) in found.items():
@@ -106,11 +106,11 @@ class BleController:
             devices.append(DeviceInfo(address, name, advertisement.rssi, services))
         devices.sort(key=lambda item: (_candidate_score(item), item.rssi), reverse=True)
         self.emit("devices", devices)
-        self.emit("status", f"검색 완료: {len(devices)}개")
+        self.emit("status", f"Scan complete: {len(devices)} device(s)")
 
     async def connect(self, address: str) -> None:
         await self.disconnect()
-        self.emit("status", f"연결 중: {address}")
+        self.emit("status", f"Connecting: {address}")
         client = BleakClient(address, disconnected_callback=self._on_disconnected, timeout=15)
         await client.connect()
         write_uuid, notify_uuid, write_with_response = self._find_uart(client)
@@ -132,26 +132,26 @@ class BleController:
             f"WRITE PROPS {','.join(write_characteristic.properties) if write_characteristic else '?'} · "
             f"NOTIFY PROPS {','.join(notify_characteristic.properties) if notify_characteristic else '?'}",
         )
-        self.emit("status", "BLE 링크 연결됨 — BCTO 프로토콜 자동 확인 중…")
+        self.emit("status", "BLE link connected — automatically verifying the BCTO protocol…")
         # The APK enables notifications before starting the telescope protocol.
         # Give Windows time to finish writing the CCCD, then retry the same task
         # once because the native implementation also has a retry path.
         await asyncio.sleep(1.2)
         initialize_packet = build_initialize(self.next_sequence())
-        self.emit("log", "초기화 조회 1/2")
+        self.emit("log", "Initialization query 1/2")
         await self.send_raw(initialize_packet)
         try:
             await asyncio.wait_for(self.handshake_event.wait(), timeout=3.0)
         except TimeoutError:
-            self.emit("log", "초기화 응답 없음 — 동일 패킷 재시도 2/2")
+            self.emit("log", "No initialization response — retrying the same packet 2/2")
             await self.send_raw(initialize_packet)
             try:
                 await asyncio.wait_for(self.handshake_event.wait(), timeout=4.0)
             except TimeoutError:
                 self.emit(
                     "protocol_failed",
-                    "BLE 링크만 연결됨 — 본체 스위치를 Bluetooth 아이콘 위치로 "
-                    "끝까지 내린 뒤 전원을 다시 켜세요. 초기화 응답(RX)이 없습니다.",
+                    "Only the BLE link is connected — move the unit switch fully down to the Bluetooth icon "
+                    "and power-cycle it. No initialization response (RX) was received.",
                 )
 
     async def disconnect(self) -> None:
@@ -204,14 +204,14 @@ class BleController:
                         )
                     )
         if not candidates:
-            raise RuntimeError("UART형 write/notify BLE 서비스를 찾지 못했습니다.")
+            raise RuntimeError("Could not find a UART-style write/notify BLE service.")
         _score, write_uuid, notify_uuid, response = max(candidates)
         return write_uuid, notify_uuid, response
 
     def _on_disconnected(self, _client: BleakClient) -> None:
         self.client = None
         self.emit("disconnected", None)
-        self.emit("status", "BLE 연결이 끊어졌습니다.")
+        self.emit("status", "BLE connection disconnected.")
 
     def _on_notify(self, _sender, value: bytearray) -> None:
         data = bytes(value)
@@ -230,9 +230,9 @@ class BleController:
 
     async def send_raw(self, packet: bytes) -> None:
         if not self.client or not self.client.is_connected or not self.write_uuid:
-            raise RuntimeError("BLE 장치가 연결되지 않았습니다.")
+            raise RuntimeError("No BLE device is connected.")
         if self.write_lock is None:
-            raise RuntimeError("BLE 쓰기 채널이 준비되지 않았습니다.")
+            raise RuntimeError("The BLE write channel is not ready.")
         async with self.write_lock:
             self.emit("log", f"TX  {packet.hex(' ')}")
             await self.client.write_gatt_char(
@@ -317,29 +317,29 @@ class App(tk.Tk):
             side="left"
         )
 
-        stellarium_frame = ttk.LabelFrame(outer, text="Stellarium 연동", padding=10)
+        stellarium_frame = ttk.LabelFrame(outer, text="Stellarium Integration", padding=10)
         stellarium_frame.pack(fill="x")
-        self.stellarium_status_var = tk.StringVar(value="TCP 서버 시작 중…")
+        self.stellarium_status_var = tk.StringVar(value="Starting TCP server…")
         ttk.Label(stellarium_frame, textvariable=self.stellarium_status_var).grid(
             row=0, column=0, columnspan=3, sticky="w"
         )
-        self.target_var = tk.StringVar(value="수신한 목표 없음")
+        self.target_var = tk.StringVar(value="No target received")
         ttk.Label(stellarium_frame, textvariable=self.target_var).grid(
             row=1, column=0, columnspan=3, sticky="w", pady=(6, 0)
         )
         ttk.Label(
             stellarium_frame,
-            text="127.0.0.1:10001 · Stellarium에서 천체 선택 후 Ctrl+1",
+            text="127.0.0.1:10001 · Select an object in Stellarium, then press Ctrl+1",
         ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
 
-        alignment_frame = ttk.LabelFrame(outer, text="다점 얼라인 · Stellarium GoTo", padding=10)
+        alignment_frame = ttk.LabelFrame(outer, text="Multi-Point Alignment · Stellarium GoTo", padding=10)
         alignment_frame.pack(fill="x", pady=(10, 0))
-        ttk.Label(alignment_frame, text="위도 (북 +)").grid(row=0, column=0, sticky="w")
+        ttk.Label(alignment_frame, text="Latitude (North +)").grid(row=0, column=0, sticky="w")
         self.latitude_var = tk.StringVar()
         ttk.Entry(alignment_frame, width=12, textvariable=self.latitude_var).grid(
             row=0, column=1, padx=(5, 14), sticky="w"
         )
-        ttk.Label(alignment_frame, text="경도 (동 +)").grid(row=0, column=2, sticky="w")
+        ttk.Label(alignment_frame, text="Longitude (East +)").grid(row=0, column=2, sticky="w")
         self.longitude_var = tk.StringVar()
         ttk.Entry(alignment_frame, width=12, textvariable=self.longitude_var).grid(
             row=0, column=3, padx=(5, 14), sticky="w"
@@ -347,72 +347,72 @@ class App(tk.Tk):
         self.auto_goto_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             alignment_frame,
-            text="Ctrl+1 수신 즉시 GoTo",
+            text="GoTo immediately on Ctrl+1 reception",
             variable=self.auto_goto_var,
         ).grid(row=0, column=4, sticky="w")
         ttk.Button(
             alignment_frame,
-            text="Stellarium 얼라인 별 선택 대기",
+            text="Wait for Stellarium alignment-star selection",
             command=self._arm_alignment_star_selection,
         ).grid(
             row=1, column=0, columnspan=2, padx=(0, 5), pady=(8, 0), sticky="ew"
         )
-        ttk.Button(alignment_frame, text="중앙 정렬 후 기준점 저장", command=self._add_alignment).grid(
+        ttk.Button(alignment_frame, text="Save reference point after centering", command=self._add_alignment).grid(
             row=1, column=2, padx=5, pady=(8, 0), sticky="ew"
         )
-        ttk.Button(alignment_frame, text="수신 목표로 GoTo", command=self._goto_target).grid(
+        ttk.Button(alignment_frame, text="GoTo received target", command=self._goto_target).grid(
             row=1, column=3, padx=5, pady=(8, 0), sticky="ew"
         )
-        ttk.Button(alignment_frame, text="GoTo 중지", command=self._cancel_goto).grid(
+        ttk.Button(alignment_frame, text="Stop GoTo", command=self._cancel_goto).grid(
             row=1, column=4, padx=(5, 0), pady=(8, 0), sticky="ew"
         )
         self.alignment_status_var = tk.StringVar(
-            value="최소 2점, 권장 3~8점 · 넓게 떨어진 별일수록 정확도가 높아집니다."
+            value="Minimum 2 points; 3–8 recommended. Widely separated stars improve accuracy."
         )
-        ttk.Button(alignment_frame, text="마지막 기준점 취소", command=self._undo_alignment).grid(
+        ttk.Button(alignment_frame, text="Undo last reference point", command=self._undo_alignment).grid(
             row=2, column=0, padx=(0, 5), pady=(8, 0), sticky="ew"
         )
-        ttk.Button(alignment_frame, text="전체 초기화", command=self._reset_alignment).grid(
+        ttk.Button(alignment_frame, text="Reset all", command=self._reset_alignment).grid(
             row=2, column=1, padx=5, pady=(8, 0), sticky="ew"
         )
         ttk.Label(alignment_frame, textvariable=self.alignment_status_var).grid(
             row=2, column=2, columnspan=3, sticky="w", pady=(8, 0)
         )
-        self.motor_position_var = tk.StringVar(value="축 위치: 수신 대기")
+        self.motor_position_var = tk.StringVar(value="Axis positions: waiting for data")
         ttk.Label(alignment_frame, textvariable=self.motor_position_var).grid(
             row=3, column=0, columnspan=5, sticky="w", pady=(4, 0)
         )
         for column in range(5):
             alignment_frame.columnconfigure(column, weight=1)
 
-        connection = ttk.LabelFrame(outer, text="BLE 연결 (실험적 수동 제어)", padding=10)
+        connection = ttk.LabelFrame(outer, text="BLE Connection (Experimental Manual Control)", padding=10)
         connection.pack(fill="x", pady=(10, 0))
         self.device_var = tk.StringVar()
         self.device_box = ttk.Combobox(connection, textvariable=self.device_var, state="readonly")
         self.device_box.grid(row=0, column=0, columnspan=3, sticky="ew", padx=(0, 8))
-        ttk.Button(connection, text="검색", command=self._scan).grid(row=0, column=3, padx=3)
-        self.connect_button = ttk.Button(connection, text="연결", command=self._connect)
+        ttk.Button(connection, text="Scan", command=self._scan).grid(row=0, column=3, padx=3)
+        self.connect_button = ttk.Button(connection, text="Connect", command=self._connect)
         self.connect_button.grid(row=0, column=4, padx=3)
-        ttk.Button(connection, text="해제", command=self._disconnect).grid(row=0, column=5, padx=3)
+        ttk.Button(connection, text="Disconnect", command=self._disconnect).grid(row=0, column=5, padx=3)
         connection.columnconfigure(0, weight=1)
 
         self.status_var = tk.StringVar(
-            value="본체 스위치를 맨 아래 Bluetooth 아이콘 위치로 놓고 전원을 다시 켠 뒤 검색하세요."
+            value="Move the unit switch fully down to the Bluetooth icon, power-cycle it, then scan."
         )
         ttk.Label(connection, textvariable=self.status_var).grid(
             row=1, column=0, columnspan=6, sticky="w", pady=(8, 0)
         )
 
-        safety = ttk.LabelFrame(outer, text="안전 설정", padding=10)
+        safety = ttk.LabelFrame(outer, text="Safety Settings", padding=10)
         safety.pack(fill="x", pady=(10, 0))
         self.armed_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             safety,
-            text="이동 제어 사용 (연결 응답이 확인된 경우에만 동작)",
+            text="Enable motion control (only operates after a connection response is confirmed)",
             variable=self.armed_var,
             command=self._movement_toggle,
         ).grid(row=0, column=0, columnspan=4, sticky="w")
-        ttk.Label(safety, text="모터 속도 단계").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(safety, text="Motor speed level").grid(row=1, column=0, sticky="w", pady=(8, 0))
         self.speed_var = tk.IntVar(value=1)
         self.speed_spinbox = ttk.Spinbox(
             safety,
@@ -424,36 +424,36 @@ class App(tk.Tk):
             textvariable=self.speed_var,
         )
         self.speed_spinbox.grid(row=1, column=1, sticky="w", padx=8, pady=(8, 0))
-        self.speed_label = ttk.Label(safety, text="1=최저 · 9=최대")
+        self.speed_label = ttk.Label(safety, text="1=slowest · 9=fastest")
         self.speed_label.grid(row=1, column=2, columnspan=2, sticky="w", padx=(3, 0), pady=(8, 0))
         self.speed_var.trace_add("write", self._update_speed_label)
         safety.columnconfigure(1, weight=1)
 
         mapping = ttk.Frame(safety)
         mapping.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(8, 0))
-        ttk.Label(mapping, text="방위축 모터").pack(side="left")
+        ttk.Label(mapping, text="Azimuth-axis motor").pack(side="left")
         self.az_motor_var = tk.IntVar(value=1)
         ttk.Combobox(mapping, width=4, state="readonly", values=(0, 1), textvariable=self.az_motor_var).pack(
             side="left", padx=(4, 12)
         )
-        ttk.Label(mapping, text="고도축 모터").pack(side="left")
+        ttk.Label(mapping, text="Altitude-axis motor").pack(side="left")
         self.alt_motor_var = tk.IntVar(value=0)
         ttk.Combobox(mapping, width=4, state="readonly", values=(0, 1), textvariable=self.alt_motor_var).pack(
             side="left", padx=(4, 12)
         )
         self.reverse_az_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(mapping, text="좌우 반전", variable=self.reverse_az_var).pack(side="left", padx=6)
+        ttk.Checkbutton(mapping, text="Reverse left/right", variable=self.reverse_az_var).pack(side="left", padx=6)
         self.reverse_alt_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(mapping, text="상하 반전", variable=self.reverse_alt_var).pack(side="left", padx=6)
+        ttk.Checkbutton(mapping, text="Reverse up/down", variable=self.reverse_alt_var).pack(side="left", padx=6)
 
-        control = ttk.LabelFrame(outer, text="수동 제어", padding=10)
+        control = ttk.LabelFrame(outer, text="Manual Control", padding=10)
         control.pack(fill="x", pady=(10, 0))
-        ttk.Button(control, text="초기화 조회", command=self._initialize).grid(
+        ttk.Button(control, text="Initialization query", command=self._initialize).grid(
             row=0, column=0, padx=8, pady=8, sticky="ew"
         )
         self.stop_button = tk.Button(
             control,
-            text="비상 정지 (양축)",
+            text="Emergency stop (both axes)",
             command=self._stop_all,
             bg="#b00020",
             fg="white",
@@ -463,10 +463,10 @@ class App(tk.Tk):
         )
         self.stop_button.grid(row=0, column=2, padx=8, pady=8, sticky="ew")
 
-        up = ttk.Button(control, text="▲  위")
-        left = ttk.Button(control, text="◀  왼쪽")
-        right = ttk.Button(control, text="오른쪽  ▶")
-        down = ttk.Button(control, text="▼  아래")
+        up = ttk.Button(control, text="▲  Up")
+        left = ttk.Button(control, text="◀  Left")
+        right = ttk.Button(control, text="Right  ▶")
+        down = ttk.Button(control, text="▼  Down")
         up.grid(row=1, column=1, padx=8, pady=5, sticky="ew")
         left.grid(row=2, column=0, padx=8, pady=5, sticky="ew")
         right.grid(row=2, column=2, padx=8, pady=5, sticky="ew")
@@ -477,14 +477,14 @@ class App(tk.Tk):
         self._bind_motion(right, "az", False)
         ttk.Label(
             control,
-            text="방향키/WASD: 이동 · 숫자열/숫자패드 1~9: 속도 · Space/Esc: 비상 정지",
+            text="Arrow keys/WASD: motion · Number row/keypad 1–9: speed · Space/Esc: emergency stop",
         ).grid(
             row=4, column=0, columnspan=3, pady=(8, 0)
         )
         for column in range(3):
             control.columnconfigure(column, weight=1)
 
-        log_frame = ttk.LabelFrame(outer, text="통신 로그", padding=8)
+        log_frame = ttk.LabelFrame(outer, text="Communication Log", padding=8)
         log_frame.pack(fill="both", expand=True, pady=(10, 0))
         self.log = tk.Text(log_frame, height=14, wrap="none", state="disabled", font=("Consolas", 9))
         self.log.pack(side="left", fill="both", expand=True)
@@ -558,14 +558,14 @@ class App(tk.Tk):
                     self._append_log(str(value))
                 elif kind == "frame":
                     frame = value
-                    state = "OK" if frame.crc_valid else "CRC 오류"
+                    state = "OK" if frame.crc_valid else "CRC ERROR"
                     self._append_log(
                         f"FRAME {state} seq={frame.sequence} cmd=0x{frame.command:02X} "
                         f"data={frame.data.hex(' ')}"
                     )
                     if frame.crc_valid:
                         self.verified_reply = True
-                        self.status_var.set("BCTO 프로토콜 응답 확인됨.")
+                        self.status_var.set("BCTO protocol response confirmed.")
                 elif kind == "error":
                     self._append_log(f"ERROR {value}")
                     self.status_var.set(str(value))
@@ -576,7 +576,7 @@ class App(tk.Tk):
     def _handle_stellarium_goto(self, target: GotoTarget) -> None:
         self.last_target = target
         self.target_var.set(
-            f"목표 수신: RA {target.ra_hours:.6f} h · Dec {target.dec_degrees:+.6f}°"
+            f"Target received: RA {target.ra_hours:.6f} h · Dec {target.dec_degrees:+.6f}°"
         )
         self._append_log(
             f"STELLARIUM GOTO RA={target.ra_hours:.8f}h Dec={target.dec_degrees:+.8f}deg"
@@ -593,22 +593,22 @@ class App(tk.Tk):
                     longitude,
                 )
                 selected = (
-                    f"얼라인 별 선택됨: RA {target.ra_hours:.4f}h / "
-                    f"Dec {target.dec_degrees:+.3f}° · 현재 Az {az:.2f}° / Alt {alt:.2f}°"
+                    f"Alignment star selected: RA {target.ra_hours:.4f}h / "
+                    f"Dec {target.dec_degrees:+.3f}° · current Az {az:.2f}° / Alt {alt:.2f}°"
                 )
             except ValueError:
                 selected = (
-                    f"얼라인 별 선택됨: RA {target.ra_hours:.4f}h / "
-                    f"Dec {target.dec_degrees:+.3f}° · 위도/경도를 입력하세요."
+                    f"Alignment star selected: RA {target.ra_hours:.4f}h / "
+                    f"Dec {target.dec_degrees:+.3f}° · enter latitude and longitude."
                 )
             self.alignment_status_var.set(
-                f"{selected} · 망원경 중앙 정렬 후 기준점 저장"
+                f"{selected} · center the telescope, then save the reference point"
             )
-            self.status_var.set("Stellarium 얼라인 별을 선택했습니다. 자동 GoTo는 실행하지 않습니다.")
+            self.status_var.set("A Stellarium alignment star was selected. Automatic GoTo will not run.")
             self._append_log(f"ALIGN STAR SELECTED {selected}")
             return
         self.status_var.set(
-            "Stellarium 목표 수신됨. 얼라인 완료 후 GoTo할 수 있습니다."
+            "Stellarium target received. GoTo is available after alignment is complete."
         )
         if self.auto_goto_var.get() and self.alignment.ready:
             self._goto_target()
@@ -617,7 +617,7 @@ class App(tk.Tk):
         self.alignment_target = None
         self.alignment_selection_armed = True
         self.alignment_status_var.set(
-            "선택 대기 중 · Stellarium에서 얼라인 별을 선택하고 Ctrl+1을 누르세요."
+            "Waiting for selection · select an alignment star in Stellarium and press Ctrl+1."
         )
         self._append_log("ALIGN STAR SELECTION ARMED")
 
@@ -626,24 +626,24 @@ class App(tk.Tk):
             latitude = float(self.latitude_var.get().strip())
             longitude = float(self.longitude_var.get().strip())
         except ValueError as exc:
-            raise ValueError("위도와 경도를 십진수 도 단위로 입력하세요.") from exc
+            raise ValueError("Enter latitude and longitude in decimal degrees.") from exc
         if not -90.0 <= latitude <= 90.0 or not -180.0 <= longitude <= 180.0:
-            raise ValueError("위도는 -90~90, 경도는 -180~180 범위여야 합니다.")
+            raise ValueError("Latitude must be between -90 and 90, and longitude between -180 and 180.")
         return latitude, longitude
 
     def _axis_count(self, axis: str) -> float:
         if self.unwrapped_motor_positions is None:
-            raise RuntimeError("본체 축 위치가 아직 수신되지 않았습니다.")
+            raise RuntimeError("The unit's axis positions have not been received yet.")
         return self.unwrapped_motor_positions[self._axis_motor(axis)]
 
     def _add_alignment(self) -> None:
         try:
             if not self.connected or not self.verified_reply:
-                raise RuntimeError("먼저 BCTO90에 연결해 위치 응답을 확인하세요.")
+                raise RuntimeError("Connect to the BCTO90 and confirm a position response first.")
             if self.alignment_target is None:
                 raise RuntimeError(
-                    "먼저 'Stellarium 얼라인 별 선택 대기'를 누른 뒤 "
-                    "Stellarium에서 별을 선택하고 Ctrl+1을 누르세요."
+                    "First click 'Wait for Stellarium alignment-star selection', then "
+                    "select a star in Stellarium and press Ctrl+1."
                 )
             latitude, longitude = self._site()
             az, alt = equatorial_to_horizontal(
@@ -660,34 +660,34 @@ class App(tk.Tk):
             )
             count = self.alignment.add(point)
             if count == 1:
-                message = f"1점 저장: Az {az:.2f}° / Alt {alt:.2f}° · 다른 방향의 두 번째 별 필요"
+                message = f"1 point saved: Az {az:.2f}° / Alt {alt:.2f}° · a second star in another direction is required"
             elif count == 2:
-                message = "2점 기본 얼라인 완료 · 정확도 향상을 위해 다른 방향의 별을 추가하세요."
+                message = "Basic two-point alignment complete · add stars in other directions to improve accuracy."
             else:
                 message = (
-                    f"{count}점 보정 완료 · RMS {self.alignment.rms_error_deg:.2f}° · "
-                    f"최대 {self.alignment.MAX_POINTS}점"
+                    f"{count}-point correction complete · RMS {self.alignment.rms_error_deg:.2f}° · "
+                    f"maximum {self.alignment.MAX_POINTS} points"
                 )
             self.alignment_target = None
             self.alignment_selection_armed = False
             self.alignment_status_var.set(
-                f"{message} · 다음 별은 Stellarium 선택 대기를 다시 누르세요."
+                f"{message} · click the Stellarium selection wait button again for the next star."
             )
             self._append_log(f"ALIGN {count}/{self.alignment.MAX_POINTS} {message}")
         except (ValueError, RuntimeError) as exc:
-            messagebox.showwarning("얼라인", str(exc))
+            messagebox.showwarning("Alignment", str(exc))
 
     def _undo_alignment(self) -> None:
         self._cancel_goto()
         count = self.alignment.remove_last()
         if count == 0:
-            message = "등록된 기준점이 없습니다."
+            message = "No reference points are registered."
         elif count == 1:
-            message = "기준점 1개 남음 · 다른 방향의 별을 추가하세요."
+            message = "1 reference point remains · add a star in another direction."
         elif count == 2:
-            message = "기준점 2개 남음 · 기본 GoTo 사용 가능"
+            message = "2 reference points remain · basic GoTo is available"
         else:
-            message = f"기준점 {count}개 · RMS {self.alignment.rms_error_deg:.2f}°"
+            message = f"{count} reference points · RMS {self.alignment.rms_error_deg:.2f}°"
         self.alignment_status_var.set(message)
         self._append_log(f"ALIGN UNDO {message}")
 
@@ -696,16 +696,16 @@ class App(tk.Tk):
         self.alignment.reset()
         self.alignment_target = None
         self.alignment_selection_armed = False
-        self.alignment_status_var.set("얼라인 초기화됨 · 최소 2점, 정확도 향상에는 3점 이상을 등록하세요.")
+        self.alignment_status_var.set("Alignment reset · register at least 2 points; 3 or more improves accuracy.")
 
     def _goto_target(self) -> None:
         try:
             if not self._motion_ready():
                 return
             if not self.alignment.ready:
-                raise RuntimeError("먼저 최소 두 별로 얼라인을 완료하세요.")
+                raise RuntimeError("Complete alignment with at least two stars first.")
             if self.last_target is None:
-                raise RuntimeError("Stellarium에서 목표 천체를 선택하고 Ctrl+1을 누르세요.")
+                raise RuntimeError("Select a target object in Stellarium and press Ctrl+1.")
             latitude, longitude = self._site()
             az, alt = equatorial_to_horizontal(
                 self.last_target.ra_hours,
@@ -714,7 +714,7 @@ class App(tk.Tk):
                 longitude,
             )
             if not 3.0 <= alt <= 85.0:
-                raise RuntimeError(f"안전 고도 범위(3~85°) 밖의 목표입니다: {alt:.2f}°")
+                raise RuntimeError(f"The target is outside the safe altitude range (3–85°): {alt:.2f}°")
             target_az, target_alt = self.alignment.counts_for(az, alt)
             targets = {
                 self._axis_motor("az"): target_az,
@@ -728,14 +728,14 @@ class App(tk.Tk):
                 if abs(remaining) < 2.0:
                     continue
                 if abs(remaining) > 0x7B0000:
-                    raise RuntimeError("목표 이동량이 프로토콜 안전 범위를 초과했습니다.")
+                    raise RuntimeError("The target movement exceeds the protocol safety range.")
                 self.goto_axes[motor] = (target, remaining)
                 self.controller.submit(self.controller.move(motor, remaining < 0, speed))
             if not self.goto_axes:
-                self.status_var.set("이미 목표 허용오차 안에 있습니다.")
+                self.status_var.set("Already within the target tolerance.")
                 return
             self.goto_deadline = time.monotonic() + 120.0
-            self.status_var.set(f"GoTo 이동 중 · Az {az:.2f}° / Alt {alt:.2f}° · 비상정지: Space/Esc")
+            self.status_var.set(f"GoTo in progress · Az {az:.2f}° / Alt {alt:.2f}° · emergency stop: Space/Esc")
             self._append_log(f"GOTO START az={az:.4f} alt={alt:.4f} targets={targets}")
         except (ValueError, RuntimeError) as exc:
             messagebox.showwarning("GoTo", str(exc))
@@ -757,7 +757,7 @@ class App(tk.Tk):
             self.raw_motor_positions = positions
         now = time.monotonic()
         if now - self._last_position_display >= 0.25:
-            self.motor_position_var.set(f"축 위치: M0 {positions[0]} · M1 {positions[1]}")
+            self.motor_position_var.set(f"Axis positions: M0 {positions[0]} · M1 {positions[1]}")
             self._last_position_display = now
         if self.alignment.ready:
             try:
@@ -772,10 +772,10 @@ class App(tk.Tk):
         if not self.goto_axes:
             return
         if now >= self.goto_deadline:
-            self._append_log("GOTO TIMEOUT — 양축 정지")
+            self._append_log("GOTO TIMEOUT — BOTH AXES STOPPED")
             self.goto_axes.clear()
             self._stop_all()
-            self.status_var.set("GoTo 제한시간 초과로 정지했습니다.")
+            self.status_var.set("GoTo stopped because the time limit was exceeded.")
             return
         finished: list[int] = []
         for motor, (target, initial) in self.goto_axes.items():
@@ -793,7 +793,7 @@ class App(tk.Tk):
         for motor in finished:
             self.goto_axes.pop(motor, None)
         if finished and not self.goto_axes:
-            self.status_var.set("GoTo 완료 · 접안부에서 미세 조정 후 필요하면 다시 얼라인하세요.")
+            self.status_var.set("GoTo complete · fine-tune at the eyepiece and realign if necessary.")
             self._append_log("GOTO COMPLETE")
 
     def _set_devices(self, devices: list[DeviceInfo]) -> None:
@@ -809,15 +809,15 @@ class App(tk.Tk):
     def _connect(self) -> None:
         device = self.devices.get(self.device_var.get())
         if not device:
-            messagebox.showwarning("BCTO90", "먼저 BLE 장치를 검색하고 선택하세요.")
+            messagebox.showwarning("BCTO90", "Scan for and select a BLE device first.")
             return
         if not any(token in device.name.upper() for token in SUPPORTED_DEVICE_TOKENS):
             proceed = messagebox.askyesno(
-                "미검증 BLE 장치",
-                "선택한 장치는 BCTO/DS20090 이름으로 식별되지 않았습니다.\n\n"
-                "Nordic UART 서비스가 같아도 BCTO 명령 체계와 호환된다는 뜻은 아닙니다. "
-                "잘못된 명령은 가대를 움직이거나 장치를 손상시킬 수 있습니다.\n\n"
-                "동일 프로토콜 장치임을 직접 확인한 경우에만 계속하세요.",
+                "Unverified BLE Device",
+                "The selected device is not identified by a BCTO/DS20090 name.\n\n"
+                "A matching Nordic UART service does not mean it is compatible with the BCTO command system. "
+                "Incorrect commands can move the mount or damage the device.\n\n"
+                "Continue only if you have verified directly that it uses the same protocol.",
             )
             if not proceed:
                 return
@@ -828,10 +828,10 @@ class App(tk.Tk):
 
     def _initialize(self) -> None:
         if not self.connected:
-            messagebox.showwarning("BCTO90", "먼저 장치에 연결하세요.")
+            messagebox.showwarning("BCTO90", "Connect to a device first.")
             return
         self.controller.submit(self.controller.initialize())
-        self.status_var.set("초기화 조회 전송됨 — 응답 대기 중…")
+        self.status_var.set("Initialization query sent — waiting for response…")
 
     def _bind_motion(self, button: ttk.Button, axis: str, negative: bool) -> None:
         source = f"mouse:{axis}:{int(negative)}"
@@ -846,22 +846,22 @@ class App(tk.Tk):
 
     def _motion_ready(self) -> bool:
         if not self.connected:
-            message = "먼저 BLE 장치에 연결하세요."
+            message = "Connect to a BLE device first."
             self.status_var.set(message)
             self._append_log(f"MOVE BLOCKED: {message}")
             return False
         if not self.armed_var.get():
-            message = "안전 설정에서 이동 제어 사용을 활성화하세요."
+            message = "Enable motion control in Safety Settings."
             self.status_var.set(message)
             self._append_log(f"MOVE BLOCKED: {message}")
             return False
         if not self.verified_reply:
-            message = "초기화 조회에 대한 유효한 BCTO 응답이 아직 없습니다."
+            message = "There is no valid BCTO response to the initialization query yet."
             self.status_var.set(message)
             self._append_log(f"MOVE BLOCKED: {message}")
             return False
         if self.az_motor_var.get() == self.alt_motor_var.get():
-            message = "방위축과 고도축 모터 번호가 서로 달라야 합니다."
+            message = "The azimuth- and altitude-axis motor numbers must differ."
             self.status_var.set(message)
             self._append_log(f"MOVE BLOCKED: {message}")
             return False
@@ -901,7 +901,7 @@ class App(tk.Tk):
         self.controller.submit(self.controller.move(motor, effective_negative, speed))
         direction = "-" if effective_negative else "+"
         self.status_var.set(
-            f"{axis.upper()}축 모터 {motor} {direction} {speed_level}단({speed}%) 이동 — 입력을 놓으면 정지"
+            f"{axis.upper()}-axis motor {motor} {direction} level {speed_level} ({speed}%) moving — release input to stop"
         )
 
     def _stop_axis(self, axis: str) -> None:
@@ -916,7 +916,7 @@ class App(tk.Tk):
         self.goto_axes.clear()
         if self.connected:
             self.controller.submit(self.controller.stop_all())
-        self.status_var.set("양축 정지 명령 전송")
+        self.status_var.set("Stop command sent to both axes")
 
     def _movement_toggle(self) -> None:
         if not self.armed_var.get():
@@ -928,7 +928,7 @@ class App(tk.Tk):
         except (tk.TclError, ValueError):
             return
         if 1 <= level <= 9:
-            self.speed_label.configure(text=f"{level}단 · 출력 {SPEED_PERCENT_BY_LEVEL[level]}%")
+            self.speed_label.configure(text=f"Level {level} · output {SPEED_PERCENT_BY_LEVEL[level]}%")
 
     def _get_speed_level(self) -> int:
         try:
@@ -951,7 +951,7 @@ class App(tk.Tk):
             return None
         self.speed_var.set(level)
         self.status_var.set(
-            f"모터 속도 {level}단 · 출력 {SPEED_PERCENT_BY_LEVEL[level]}%"
+            f"Motor speed level {level} · output {SPEED_PERCENT_BY_LEVEL[level]}%"
         )
         return "break"
 

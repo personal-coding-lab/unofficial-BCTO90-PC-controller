@@ -82,7 +82,7 @@ def _solve_3x3(matrix: list[list[float]], values: list[float]) -> tuple[float, f
     for column in range(3):
         pivot = max(range(column, 3), key=lambda row: abs(augmented[row][column]))
         if abs(augmented[pivot][column]) < 1e-9:
-            raise ValueError("별 배치가 한쪽에 몰려 있습니다. 다른 방향의 별을 추가하세요.")
+            raise ValueError("The alignment stars are clustered on one side. Add a star in another direction.")
         augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
         divisor = augmented[column][column]
         augmented[column] = [value / divisor for value in augmented[column]]
@@ -142,22 +142,22 @@ class MultiStarAlignment:
 
     def add(self, point: AlignmentPoint) -> int:
         if len(self.points) >= self.MAX_POINTS:
-            raise ValueError("얼라인 기준점은 최대 8개입니다. 초기화 후 다시 등록하세요.")
+            raise ValueError("A maximum of eight alignment reference points is allowed. Reset and register again.")
         for existing in self.points:
             separation = math.hypot(
                 wrap_degrees(point.az_deg - existing.az_deg),
                 point.alt_deg - existing.alt_deg,
             )
             if separation < 3.0:
-                raise ValueError("기존 기준점과 너무 가깝습니다. 3° 이상 떨어진 별을 선택하세요.")
+                raise ValueError("This point is too close to an existing reference point. Select a star at least 3° away.")
         previous = (self.az_coefficients, self.alt_coefficients, self.rms_error_deg)
         self.points.append(point)
         try:
             self._fit()
             if len(self.points) >= 3 and self.rms_error_deg > 3.0:
                 raise ValueError(
-                    f"새 기준점 적용 오차가 너무 큽니다(RMS {self.rms_error_deg:.2f}°). "
-                    "별 중앙 정렬과 위치 입력을 확인하세요."
+                    f"The error after adding this reference point is too large (RMS {self.rms_error_deg:.2f}°). "
+                    "Check that the star is centered and that the location is entered correctly."
                 )
         except ValueError:
             self.points.pop()
@@ -182,11 +182,11 @@ class MultiStarAlignment:
             delta_alt = second.alt_deg - first.alt_deg
             if abs(delta_az) < 5.0 or abs(delta_alt) < 5.0:
                 self.points.pop()
-                raise ValueError("두 별은 방위각과 고도가 각각 5° 이상 떨어져야 합니다.")
+                raise ValueError("The two stars must differ by at least 5° in both azimuth and altitude.")
             az_scale = (second.az_count - first.az_count) / delta_az
             alt_scale = (second.alt_count - first.alt_count) / delta_alt
             if abs(az_scale) < 1.0 or abs(alt_scale) < 1.0:
-                raise ValueError("축 위치 변화가 너무 작습니다. 두 번째 별을 다시 정렬하세요.")
+                raise ValueError("The axis-position change is too small. Align the second star again.")
             self.az_coefficients = (first.az_count, az_scale, 0.0)
             self.alt_coefficients = (
                 first.alt_count - alt_scale * first.alt_deg,
@@ -202,7 +202,7 @@ class MultiStarAlignment:
         self.az_coefficients = _least_squares(features, [p.az_count for p in self.points])
         self.alt_coefficients = _least_squares(features, [p.alt_count for p in self.points])
         if abs(self._determinant()) < 1e-6:
-            raise ValueError("축 보정 행렬이 불안정합니다. 더 넓게 떨어진 별을 선택하세요.")
+            raise ValueError("The axis-correction matrix is unstable. Select stars farther apart.")
         errors = []
         for point in self.points:
             predicted_az, predicted_alt = self.horizontal_for_counts(
@@ -224,7 +224,7 @@ class MultiStarAlignment:
 
     def counts_for(self, az_deg: float, alt_deg: float) -> tuple[float, float]:
         if not self.ready:
-            raise RuntimeError("최소 2점 얼라인이 완료되지 않았습니다.")
+            raise RuntimeError("At least two alignment points have not been completed.")
         feature = (1.0, wrap_degrees(az_deg - self.points[0].az_deg), alt_deg)
         return (
             sum(value * coefficient for value, coefficient in zip(feature, self.az_coefficients)),
@@ -233,7 +233,7 @@ class MultiStarAlignment:
 
     def horizontal_for_counts(self, az_count: float, alt_count: float) -> tuple[float, float]:
         if not self.ready:
-            raise RuntimeError("최소 2점 얼라인이 완료되지 않았습니다.")
+            raise RuntimeError("At least two alignment points have not been completed.")
         determinant = self._determinant()
         az_rhs = az_count - self.az_coefficients[0]
         alt_rhs = alt_count - self.alt_coefficients[0]

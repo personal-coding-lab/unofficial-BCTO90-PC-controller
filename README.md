@@ -1,75 +1,73 @@
-# BCTO90(DS20090) Bluetooth 제어기
+# BCTO90 (DS20090) Bluetooth Controller
 
-[![tests](https://github.com/bit-code-lab/unofficial-BCTO90-PC-controller/actions/workflows/tests.yml/badge.svg)](https://github.com/bit-code-lab/unofficial-BCTO90-PC-controller/actions/workflows/tests.yml)
+[![tests](https://github.com/personal-coding-lab/unofficial-BCTO90-PC-controller/actions/workflows/tests.yml/badge.svg)](https://github.com/personal-coding-lab/unofficial-BCTO90-PC-controller/actions/workflows/tests.yml)
 
-> 비공식 오픈소스 호환 프로젝트입니다. 제조사·유통사·Meade·Stellarium과
-> 제휴하거나 승인받은 공식 소프트웨어가 아닙니다. 제품명은 호환 대상 식별
-> 목적으로만 사용합니다. 자세한 내용은 [NOTICE.md](NOTICE.md)를 확인하십시오.
+> This is an unofficial, open-source compatibility project. It is not official software affiliated with or endorsed by the manufacturer, distributor, Meade, or Stellarium. Product names are used only to identify compatible equipment. See [NOTICE.md](NOTICE.md) for details.
 
-이 프로그램은 Bluetooth LE만 사용합니다. 직렬 포트, COM 포트, HBX/LX200 및 `pyserial` 코드는 포함하지 않습니다.
+This program uses Bluetooth LE only. It does not include serial-port, COM-port, HBX/LX200, or `pyserial` code.
 
-## 호환 범위
+## Compatibility Scope
 
-- 실기 검증: BCTO90/DS20090 가대 1대, Windows 11 x64, Python 3.13.
-- 자동 테스트 대상: Windows 11과 Python 3.10~3.13.
-- 미검증: 다른 생산 시기의 BCTO90/DS20090, Windows 10.
-- 비호환 또는 미지원: 일반 Nordic UART 장치, 다른 제조사의 망원경, macOS, Linux, ASCOM, INDI, HBX/LX200 및 COM 포트.
-- 같은 BLE UUID를 사용하는 것만으로 같은 명령·CRC·모터 배치라고 판단할 수 없습니다. 이름이 `BCTO` 또는 `DS20090`으로 식별되지 않는 장치는 연결 전에 경고가 표시됩니다.
+- Hardware verified: one BCTO90/DS20090 mount, Windows 11 x64, and Python 3.13.
+- Automated tests: Windows 11 and Python 3.10–3.13.
+- Not verified: BCTO90/DS20090 units from other production periods or Windows 10.
+- Incompatible or unsupported: generic Nordic UART devices, telescopes from other manufacturers, macOS, Linux, ASCOM, INDI, HBX/LX200, and COM ports.
+- A matching BLE UUID alone does not establish that a device uses the same commands, CRC, or motor mapping. A warning is shown before connecting to devices whose name is not identified as `BCTO` or `DS20090`.
 
-세부 근거와 제한은 [COMPATIBILITY.md](COMPATIBILITY.md)를 확인하십시오.
+See [COMPATIBILITY.md](COMPATIBILITY.md) for supporting details and limitations.
 
-## 실행과 BLE 연결
+## Running the Program and Connecting over BLE
 
-1. 본체 뒤쪽 3단 스위치를 `I`나 `O`가 아니라 **맨 아래 Bluetooth 아이콘 위치**로 끝까지 내립니다.
-2. 휴대폰의 BCTO 앱을 완전히 종료합니다. 다른 기기가 `BCTO 90`에 연결되어 있지 않아야 합니다.
-3. Python 3.10 이상이 설치되어 있어야 합니다. 첫 실행에는 Bleak 설치를 위한 인터넷 연결이 필요합니다.
-4. `run.exe`를 더블클릭합니다.
-5. **검색** → 이름이 정확히 `BCTO 90`인 장치 선택 → **연결**. 초기화 조회는 자동으로 두 번까지 시도됩니다.
-6. `BCTO 프로토콜 응답 확인됨`과 `FRAME OK`가 모두 표시되어야 실제 연결입니다. `GATT LINK` 또는 `BLE 링크만 연결됨`만 보이면 연결 실패입니다.
-7. 처음에는 모터 속도 `1단`을 선택하고 짧게 눌러 방향을 확인합니다.
+1. Move the three-position switch on the rear of the unit fully down to the **lowest Bluetooth-icon position**—not to `I` or `O`.
+2. Close the BCTO app on your phone completely. No other device may be connected to `BCTO 90`.
+3. Install Python 3.10 or later. An internet connection is required on the first run to install Bleak.
+4. Double-click `run.exe`.
+5. Click **Scan**, select the device named exactly `BCTO 90`, then click **Connect**. Initialization queries are retried automatically up to twice.
+6. A real connection requires both `BCTO protocol response confirmed` and `FRAME OK`. `GATT LINK` or `BLE link only` alone indicates a failed connection.
+7. Start with motor speed level `1` and press each direction briefly to confirm motion.
 
-## 이동·속도·방향 반전
+## Motion, Speed, and Direction Reversal
 
-- 방향 버튼이나 키를 누를 때 이동 명령을 한 번 전송하고, 놓는 순간 정지 명령을 전송합니다. 반복 이동 명령은 보내지 않습니다.
-- 키보드는 방향키 또는 `W/A/S/D`를 사용합니다. `Space` 또는 `Esc`는 양축 비상 정지입니다.
-- 속도는 숫자 입력칸, 키보드 위쪽 숫자열, 숫자 키패드의 `1`~`9`로 지정합니다. 1단은 1%로 가장 느리고 9단은 100%로 가장 빠릅니다. 숫자 키패드는 `Num Lock`이 켜져 있어도 인식합니다.
-- 단계별 출력은 `1, 2, 4, 8, 16, 32, 50, 75, 100%`입니다.
-- 좌우/상하 축이 바뀌면 `방위축 모터`와 `고도축 모터`의 `0/1`을 서로 바꾸십시오. 방향만 반대라면 `좌우 반전` 또는 `상하 반전`을 사용하십시오. 두 반전 옵션은 모두 기본적으로 선택되지 않습니다.
-- BCTO90 실기 확인 기본값은 `방위축(좌우)=모터 1`, `고도축(상하)=모터 0`입니다.
+- Pressing a direction button or key sends one motion command; releasing it sends a stop command. Repeated motion commands are not sent.
+- Use the arrow keys or `W/A/S/D` for keyboard control. `Space` or `Esc` performs an emergency stop on both axes.
+- Set the speed with the numeric entry, the number row, or numeric-keypad `1`–`9`. Level 1 is the slowest at 1%, and level 9 is the fastest at 100%. The numeric keypad works whether Num Lock is on or off.
+- The output levels are `1, 2, 4, 8, 16, 32, 50, 75, 100%`.
+- If the left/right and up/down axes are swapped, exchange the `0/1` assignments for the `Azimuth-axis motor` and `Altitude-axis motor`. If only a direction is reversed, use `Reverse left/right` or `Reverse up/down`. Both reversal options are off by default.
+- The hardware-verified BCTO90 defaults are `Azimuth (left/right) = motor 1` and `Altitude (up/down) = motor 0`.
 
 ## Stellarium
 
-- 프로그램은 `127.0.0.1:10001`에서 Stellarium TCP 연결과 선택 천체의 목표 좌표를 받습니다.
-- Stellarium을 종료한 상태에서 `configure_stellarium.ps1`을 한 번 실행하면 `BCTO90 BLE Bridge`가 등록됩니다.
-- Stellarium에서 천체를 선택하고 `Ctrl+1`을 누르면 프로그램 로그와 화면에 RA/Dec가 나타납니다.
-- 실행 순서는 `run.exe` 실행 → TCP `대기 중` 확인 → Stellarium 실행입니다.
+- The program accepts a Stellarium TCP connection and the target coordinates of the selected object at `127.0.0.1:10001`.
+- With Stellarium closed, run `configure_stellarium.ps1` once to register `BCTO90 BLE Bridge`.
+- Select an object in Stellarium and press `Ctrl+1`; its RA/Dec appears in the application log and UI.
+- Start in this order: run `run.exe` → confirm TCP is `Listening` → start Stellarium.
 
-## 다점 얼라인과 GoTo
+## Multi-Point Alignment and GoTo
 
-1. 관측지 위도와 경도를 십진수 도 단위로 입력합니다. 한국은 위도와 경도 모두 `+`입니다.
-2. 프로그램에서 `Stellarium 얼라인 별 선택 대기`를 누릅니다.
-3. Stellarium에서 첫 번째 밝은 별을 선택하고 `Ctrl+1`을 누릅니다. 이 선택은 얼라인 전용으로 저장되며 `Ctrl+1 수신 즉시 GoTo`가 켜져 있어도 자동 이동하지 않습니다.
-4. 수동 버튼으로 그 별을 접안부 중앙에 맞춘 뒤 `중앙 정렬 후 기준점 저장`을 누릅니다.
-5. 방위각과 고도가 각각 5° 이상 다른 두 번째 별로 2~4를 반복합니다. 이때부터 기본 GoTo가 가능합니다.
-6. 정확도 향상을 위해 하늘의 다른 방향에 있는 별을 추가합니다. 최대 8점이며 3점부터 가대 기울어짐과 축 간 오차를 함께 보정하고 RMS 오차를 표시합니다.
-7. 원하는 천체를 선택해 `Ctrl+1`을 누르고 `수신 목표로 GoTo`를 누릅니다.
-8. `Ctrl+1 수신 즉시 GoTo`는 수동 GoTo 확인 후에만 켜십시오. 이동 중 `Space`, `Esc`, `비상 정지`로 즉시 양축을 정지할 수 있습니다.
+1. Enter the observing site's latitude and longitude in decimal degrees. For South Korea, both values are positive.
+2. In the program, click `Wait for Stellarium alignment-star selection`.
+3. In Stellarium, select the first bright star and press `Ctrl+1`. This selection is stored only for alignment; it does not trigger automatic motion even if `GoTo immediately on Ctrl+1 reception` is enabled.
+4. Use the manual controls to center the star in the eyepiece, then click `Save reference point after centering`.
+5. Repeat steps 2–4 with a second star that differs by at least 5° in both azimuth and altitude. Basic GoTo is available from this point.
+6. Add stars in other areas of the sky to improve accuracy. Up to eight points are supported; from three points, mount tilt and inter-axis error are also compensated, and RMS error is displayed.
+7. Select the desired object, press `Ctrl+1`, and click `GoTo received target`.
+8. Enable `GoTo immediately on Ctrl+1 reception` only after confirming manual GoTo. During motion, `Space`, `Esc`, or `Emergency stop` immediately stops both axes.
 
-GoTo는 APK와 실제 로그에서 확인된 `0x22` 모터 위치 피드백을 사용해 축별로 정지합니다. 잘못 등록한 점은 `마지막 기준점 취소`로 제거할 수 있습니다. 프로그램을 다시 시작하거나 축 매핑을 바꾸면 얼라인을 다시 수행해야 합니다. 안전을 위해 고도 3~85° 범위만 허용합니다.
+GoTo stops each axis using the `0x22` motor-position feedback confirmed in the APK and hardware logs. Remove an incorrectly registered point with `Undo last reference point`. Perform alignment again after restarting the program or changing the axis mapping. For safety, only altitudes from 3° to 85° are allowed.
 
-## 확인 상태와 제한
+## Verification Status and Limitations
 
-- 확인됨: BLE 장치 `BCTO 90` 검색 및 Nordic-UART형 GATT `6e400001/0002/0003` 연결.
-- 확인됨: 휴대전화의 실제 통신 캡처와 APK 네이티브 CRC 테이블을 대조한 초기화·응답 ACK·이동·정지 패킷 생성.
-- 확인됨: 공식 앱도 알림 특성을 먼저 활성화하고 쓰기 특성에 응답 없는 쓰기(Write Without Response)를 사용합니다.
-- 수정·실기 검증됨: 기존 프로그램의 CRC가 공식 앱과 달라 본체가 초기화 명령을 무시하던 문제.
-- 실기 검증됨: PC 초기화 `5A 06 36 00 00 11` 전송 후 본체 응답, CRC 검증, 응답 ACK 및 상태 프레임 수신.
-- 실기 로그에서 확인됨: `0x22` 프레임으로 모터 0/1 위치값이 연속 수신됨. 이를 다점 얼라인과 폐루프 GoTo 정지 판단에 사용.
-- 수정됨: 버튼을 눌렀을 때 이동 명령 없이 정지 명령만 전송되던 GUI 입력 처리.
-- 수정됨: 100%에서 사용하던 미검증 `0x17` 반복 명령을 제거하고 공식 앱에서 확인된 `0x18` 이동과 `0x16` 정지로 통일.
-- 유효한 BCTO 응답이 확인되기 전에는 수동 모터 이동도 차단됩니다.
-- 통신 기록은 프로그램 폴더의 `logs`에 UTF-8로 저장됩니다.
+- Verified: scanning for the `BCTO 90` BLE device and connecting through Nordic-UART-style GATT `6e400001/0002/0003`.
+- Verified: initialization, response ACK, motion, and stop packet generation, cross-checked against an actual phone communication capture and the APK's native CRC table.
+- Verified: the official app also enables the notification characteristic first and uses Write Without Response for the write characteristic.
+- Fixed and hardware verified: a CRC mismatch in the previous program that caused the mount to ignore initialization commands.
+- Hardware verified: mount response, CRC validation, response ACK, and status-frame reception after sending the PC initialization sequence `5A 06 36 00 00 11`.
+- Confirmed in hardware logs: continuous motor 0/1 position values received in `0x22` frames. These are used for multi-point alignment and closed-loop GoTo stopping decisions.
+- Fixed: GUI input handling that sent only a stop command instead of a motion command when a button was pressed.
+- Fixed: removed the unverified repeated `0x17` command previously used at 100%; motion and stopping now consistently use the `0x18` motion and `0x16` stop commands verified in the official app.
+- Manual motor motion is also blocked until a valid BCTO response has been confirmed.
+- Communication logs are saved as UTF-8 in the `logs` directory next to the program.
 
-## 라이선스와 안전
+## License and Safety
 
-프로젝트 자체 코드는 [MIT License](LICENSE)로 배포합니다. 원본 APK, 제조사 펌웨어와 소스 코드, 제품 사진 및 카탈로그 자료는 포함하지 않습니다. 천체망원경의 무인 운전은 충돌·케이블 손상 위험이 있으므로 첫 이동은 반드시 저속에서 사람이 지켜보며 확인하십시오. 이 프로젝트는 장비 손상이나 관측 손실을 보증하지 않습니다.
+The project's own code is distributed under the [MIT License](LICENSE). It does not include the original APK, manufacturer firmware or source code, product photos, or catalog materials. Unattended telescope operation risks collisions and cable damage; for the first motion, always use low speed and observe the mount in person. This project does not guarantee against equipment damage or lost observing time.

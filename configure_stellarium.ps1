@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $running = Get-Process -Name stellarium -ErrorAction SilentlyContinue
 if ($running) {
-    throw 'Stellarium을 완전히 종료한 뒤 이 스크립트를 다시 실행하세요.'
+    throw 'Close Stellarium completely, then run this script again.'
 }
 
 $userDir = Join-Path $env:APPDATA 'Stellarium'
@@ -12,7 +12,7 @@ $telescopesPath = Join-Path $moduleDir 'telescopes.json'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
 if (-not (Test-Path -LiteralPath $configPath)) {
-    throw "Stellarium 설정 파일을 찾지 못했습니다: $configPath"
+    throw "Could not find the Stellarium configuration file: $configPath"
 }
 
 Copy-Item -LiteralPath $configPath -Destination "$configPath.bcto90-$stamp.bak"
@@ -20,7 +20,7 @@ $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8
 if ($config -match '(?m)^\s*TelescopeControl\s*=') {
     $config = [regex]::Replace($config, '(?m)^(\s*TelescopeControl\s*=\s*).+$', '${1}true')
 } else {
-    throw 'config.ini에서 TelescopeControl 항목을 찾지 못했습니다.'
+    throw 'Could not find the TelescopeControl entry in config.ini.'
 }
 [System.IO.File]::WriteAllText($configPath, $config, [System.Text.UTF8Encoding]::new($false))
 
@@ -44,7 +44,7 @@ foreach ($candidate in 1..9) {
     }
 }
 if (-not $slot) {
-    throw 'Stellarium 망원경 슬롯 1~9가 모두 사용 중입니다. 한 슬롯을 비운 뒤 다시 실행하세요.'
+    throw 'All Stellarium telescope slots (1–9) are in use. Free a slot, then run this script again.'
 }
 
 $entry = [pscustomobject]@{
@@ -65,5 +65,5 @@ if ($existing) {
 $json = $settings | ConvertTo-Json -Depth 5
 [System.IO.File]::WriteAllText($telescopesPath, $json, [System.Text.UTF8Encoding]::new($false))
 
-Write-Host "Stellarium Telescope Control 설정 완료: 슬롯 $slot / BCTO90 BLE Bridge / 127.0.0.1:10001"
-Write-Host "백업: $configPath.bcto90-$stamp.bak"
+Write-Host "Stellarium Telescope Control configured: slot $slot / BCTO90 BLE Bridge / 127.0.0.1:10001"
+Write-Host "Backup: $configPath.bcto90-$stamp.bak"
